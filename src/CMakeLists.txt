@@ -31,8 +31,12 @@ set(LEDS
     ${CMAKE_CURRENT_LIST_DIR}/drivers/leds/leds.h
 )
 
+
+
 add_executable(${ProjectName}
     main.c
+    mqtt_task.c
+    mqtt_task.h
     ${DISPLAY_SOURCES}
     ${MPU6050}
     ${FALL_DETECTOR}
@@ -44,6 +48,16 @@ add_executable(${ProjectName}
 pico_enable_stdio_uart(${ProjectName} 0)
 pico_enable_stdio_usb(${ProjectName} 1)
 
+
+
+add_compile_definitions(
+    WIFI_SSID="\"minhaWifi\""
+    WIFI_PASSWORD="\"senha123\""
+    MQTT_SERVER="\"192.168.1.10\""
+    MQTT_USERNAME="\"user\""
+    MQTT_PASSWORD="\"pass\""
+)
+
 # Adicionar includes da pasta display
 target_include_directories(${ProjectName} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
@@ -51,6 +65,9 @@ target_include_directories(${ProjectName} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/drivers/mpu6050
     ${CMAKE_CURRENT_LIST_DIR}/drivers/fallDetector
     ${CMAKE_CURRENT_LIST_DIR}/drivers/simulation
+    ${PICO_SDK_PATH}/lib/lwip/src/include
+    ${PICO_SDK_PATH}/lib/lwip/src/include/arch
+    ${PICO_SDK_PATH}/lib/lwip/src/include/lwip
 )
 
 target_link_libraries(${ProjectName}
@@ -61,6 +78,9 @@ target_link_libraries(${ProjectName}
     hardware_gpio
     hardware_adc
     hardware_pwm  
+    pico_cyw43_arch_lwip_threadsafe_background
+    pico_lwip_mqtt
 )
+
 
 pico_add_extra_outputs(${ProjectName})
