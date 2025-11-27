@@ -17,7 +17,8 @@
 #include "drivers/display/ssd1306.h"
 #include "drivers/display/ssd1306_fonts.h"
 
-#include "drivers/bh1750/bh1750.h" // seu driver VL53L0X .h/.c
+#include "drivers/vl53l0x/vl53l0x.h" 
+#include "drivers/leds/leds.h"
 
 #define LED_PIN 12
 #define I2C_PORT i2c0
@@ -26,6 +27,7 @@
 #define MPU_I2C_BAUDRATE 400000
 
 #define SIM_PIN 5
+#define BUZZER 21
 #define BUTTON_PIN 6
 
 extern SemaphoreHandle_t i2c_mutex = NULL;
@@ -36,6 +38,7 @@ static SemaphoreHandle_t button_sem = NULL; // Semaphore para interrupção do b
 #define PROXIMITY_CONFIRM_COUNT 3
 
 volatile bool proximity_alert = false;
+volatile bool fall_detected = false;
 volatile uint16_t vl53_last_range = 0;
 
 /* --- Callback da interrupção do botão --- */
@@ -101,6 +104,13 @@ void mpu_task(void *p)
             printf("[BUTTON] QUEDA MARCADA POR BOTÃO!\n");
         }
 
+        // Atualiza variável global de queda para LED
+        if (fs.fall)
+        {
+            fall_detected = true;
+            fs.fall = false;
+        }
+
         // LOG periódico
         TickType_t now = xTaskGetTickCount();
         if (now - last_log >= pdMS_TO_TICKS(LOG_INTERVAL_MS))
@@ -114,7 +124,6 @@ void mpu_task(void *p)
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
             ssd1306_Fill(Black);
-
             char buf[32];
 
             // ACCEL
@@ -137,11 +146,10 @@ void mpu_task(void *p)
             ssd1306_WriteString(buf, Font_6x8, White);
 
             // QUEDA
-            if (fs.fall)
+            if (fall_detected)
             {
                 ssd1306_SetCursor(70, 45);
                 ssd1306_WriteString("QUEDA!", Font_7x10, White);
-                fs.fall = false;
             }
 
             ssd1306_UpdateScreen();
@@ -158,12 +166,9 @@ void mpu_task(void *p)
 void vl53_task(void *p)
 {
     printf("[VL53] VL53 task iniciada\n");
-
     vTaskDelay(pdMS_TO_TICKS(300));
 
     bool vl53_ok = false;
-
-    // Inicialização
     if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(500)) == pdTRUE)
     {
         printf("[VL53] Inicializando sensor...\n");
@@ -187,14 +192,13 @@ void vl53_task(void *p)
             continue;
         }
 
-        // **Ignora leitura se SIM_PIN estiver pressionado**
+        // Ignora leitura se simulação ativa
         if (gpio_get(SIM_PIN) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
-        // Leitura
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
             bool ok = vl53l0x_read_range_mm(I2C_PORT, &range_mm, 200);
@@ -228,23 +232,56 @@ void vl53_task(void *p)
     }
 }
 
-
 /* ============================================================
                      TAREFA DO LED
    ============================================================ */
+/* ============================================================
+                     TAREFA DO LED + BUZZER
+   ============================================================ */
 void led_task(void *p)
 {
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
+    const uint32_t LED_DELAY_NORMAL = 300;
+    const uint32_t LED_DELAY_FALL = 500;
 
-    while (true)
+    // Inicializa buzzer
+    gpio_init(BUZZER);
+    gpio_set_dir(BUZZER, GPIO_OUT);
+    gpio_put(BUZZER, 0);
+
+    leds_init();  // Inicializa LEDs
+
+    while (1)
     {
-        gpio_put(LED_PIN, 1);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        gpio_put(LED_PIN, 0);
-        vTaskDelay(pdMS_TO_TICKS(100));
+        if (fall_detected)
+        {
+            // Queda detectada → vermelho fixo + buzzer
+            leds_off_all();
+            led_on(LED_VERMELHO);
+            gpio_put(BUZZER, 1);  // Liga buzzer
+            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
+            gpio_put(BUZZER, 0);  // Desliga buzzer (pode deixar ligado se quiser)
+        }
+        else if (gpio_get(SIM_PIN) == 0)
+        {
+            // Simulação ativa → verde fixo
+            leds_off_all();
+            led_on(LED_VERDE);
+            gpio_put(BUZZER, 0);  // Garante buzzer desligado
+            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
+        }
+        else
+        {
+            // Leitura normal → azul piscando
+            leds_off_all();
+            led_on(LED_AZUL);
+            gpio_put(BUZZER, 0);  // Garante buzzer desligado
+            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
+            leds_off_all();
+            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
+        }
     }
 }
+
 
 /* ============================================================
                          MAIN
@@ -264,7 +301,6 @@ int main()
     gpio_set_dir(SIM_PIN, GPIO_IN);
     gpio_pull_up(SIM_PIN);
 
-    // Botão
     gpio_init(BUTTON_PIN);
     gpio_set_dir(BUTTON_PIN, GPIO_IN);
     gpio_pull_up(BUTTON_PIN);
@@ -275,7 +311,6 @@ int main()
     button_sem = xSemaphoreCreateBinary();
     if (!button_sem) { while(1); }
 
-    // Configura interrupção do botão
     gpio_set_irq_enabled_with_callback(BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true, &button_isr);
 
     // Init MPU + OLED

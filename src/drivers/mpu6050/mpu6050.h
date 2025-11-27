@@ -24,4 +24,5 @@ typedef struct {
 void mpu6500_init(i2c_inst_t* i2c_port);
 void mpu6500_read_raw(i2c_inst_t* i2c_port, mpu6500_data_t* data);
 
+
 #endif

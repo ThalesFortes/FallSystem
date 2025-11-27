@@ -1,4 +1,4 @@
-#include "bh1750.h"
+#include "vl53l0x.h"
 #include "pico/stdlib.h"
 
 // Registradores principais (mapa usado por bibliotecas Pololu/Adafruit)

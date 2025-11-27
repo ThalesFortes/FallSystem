@@ -21,9 +21,14 @@ set(SIMULATION
     ${CMAKE_CURRENT_LIST_DIR}/drivers/simulation/sim_task.h
 )
 
-set(BH1750
-    ${CMAKE_CURRENT_LIST_DIR}/drivers/bh1750/bh1750.c
-    ${CMAKE_CURRENT_LIST_DIR}/drivers/bh1750/bh1750.h
+set(VL53L0X
+    ${CMAKE_CURRENT_LIST_DIR}/drivers/vl53l0x/vl53l0x.c
+    ${CMAKE_CURRENT_LIST_DIR}/drivers/vl53l0x/vl53l0x.h
+)
+
+set(LEDS
+    ${CMAKE_CURRENT_LIST_DIR}/drivers/leds/leds.c
+    ${CMAKE_CURRENT_LIST_DIR}/drivers/leds/leds.h
 )
 
 add_executable(${ProjectName}
@@ -32,7 +37,8 @@ add_executable(${ProjectName}
     ${MPU6050}
     ${FALL_DETECTOR}
     ${SIMULATION}
-    ${BH1750}
+    ${VL53L0X}
+    ${LEDS}
 )
 
 pico_enable_stdio_uart(${ProjectName} 0)
