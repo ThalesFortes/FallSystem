@@ -1,5 +1,4 @@
-// main.c (VERSÃO COM INTERRUPÇÃO NO BOTÃO 16)
-// ---- SUAS INCLUDES ----
+#include "pico/cyw43_arch.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
@@ -20,6 +19,8 @@
 #include "drivers/vl53l0x/vl53l0x.h" 
 #include "drivers/leds/leds.h"
 
+#include "mqtt_task.h"
+
 #define LED_PIN 12
 #define I2C_PORT i2c0
 #define I2C_SDA_PIN 0
@@ -31,7 +32,7 @@
 #define BUTTON_PIN 6
 
 extern SemaphoreHandle_t i2c_mutex = NULL;
-static SemaphoreHandle_t button_sem = NULL; // Semaphore para interrupção do botão
+static SemaphoreHandle_t button_sem = NULL;
 
 #define LOG_INTERVAL_MS 1000
 #define PROXIMITY_THRESHOLD_MM 200U
@@ -41,7 +42,6 @@ volatile bool proximity_alert = false;
 volatile bool fall_detected = false;
 volatile uint16_t vl53_last_range = 0;
 
-/* --- Callback da interrupção do botão --- */
 void button_isr(uint gpio, uint32_t events)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -49,9 +49,7 @@ void button_isr(uint gpio, uint32_t events)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-/* ============================================================
-                   TAREFA DO MPU  (OLED + MPU + VL53)
-   ============================================================ */
+
 void mpu_task(void *p)
 {
     printf("[MPU] Task iniciada!\n");
@@ -64,7 +62,6 @@ void mpu_task(void *p)
 
     for (;;)
     {
-        // Ler MPU usando Mutex I2C
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
             mpu6500_read_raw(I2C_PORT, &data);
@@ -89,7 +86,6 @@ void mpu_task(void *p)
 
         fall_update(&fs, accel_raw, gyro_raw);
 
-        // Detecta proximidade
         if (proximity_alert)
         {
             fs.fall = true;
@@ -97,21 +93,18 @@ void mpu_task(void *p)
             printf("[MPU] QUEDA MARCADA POR PROXIMIDADE!\n");
         }
 
-        // Detecta botão via Semaphore
         if (xSemaphoreTake(button_sem, 0) == pdTRUE)
         {
             fs.fall = true;
             printf("[BUTTON] QUEDA MARCADA POR BOTÃO!\n");
         }
 
-        // Atualiza variável global de queda para LED
         if (fs.fall)
         {
             fall_detected = true;
             fs.fall = false;
         }
 
-        // LOG periódico
         TickType_t now = xTaskGetTickCount();
         if (now - last_log >= pdMS_TO_TICKS(LOG_INTERVAL_MS))
         {
@@ -126,26 +119,22 @@ void mpu_task(void *p)
             ssd1306_Fill(Black);
             char buf[32];
 
-            // ACCEL
             ssd1306_SetCursor(0, 0);
             ssd1306_WriteString("Accel(g):", Font_6x8, White);
             sprintf(buf, "%.2f %.2f %.2f", ax, ay, az);
             ssd1306_SetCursor(0, 10);
             ssd1306_WriteString(buf, Font_6x8, White);
 
-            // GYRO
             ssd1306_SetCursor(0, 25);
             ssd1306_WriteString("Gyro(d/s):", Font_6x8, White);
             sprintf(buf, "%.2f %.2f %.2f", gx, gy, gz);
             ssd1306_SetCursor(0, 35);
             ssd1306_WriteString(buf, Font_6x8, White);
 
-            // VL53 DISTANCE
             sprintf(buf, "D:%umm", vl53_last_range);
             ssd1306_SetCursor(0, 45);
             ssd1306_WriteString(buf, Font_6x8, White);
 
-            // QUEDA
             if (fall_detected)
             {
                 ssd1306_SetCursor(70, 45);
@@ -160,9 +149,6 @@ void mpu_task(void *p)
     }
 }
 
-/* ============================================================
-                     TAREFA DO VL53L0X
-   ============================================================ */
 void vl53_task(void *p)
 {
     printf("[VL53] VL53 task iniciada\n");
@@ -192,7 +178,6 @@ void vl53_task(void *p)
             continue;
         }
 
-        // Ignora leitura se simulação ativa
         if (gpio_get(SIM_PIN) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -232,49 +217,39 @@ void vl53_task(void *p)
     }
 }
 
-/* ============================================================
-                     TAREFA DO LED
-   ============================================================ */
-/* ============================================================
-                     TAREFA DO LED + BUZZER
-   ============================================================ */
 void led_task(void *p)
 {
     const uint32_t LED_DELAY_NORMAL = 300;
     const uint32_t LED_DELAY_FALL = 500;
 
-    // Inicializa buzzer
     gpio_init(BUZZER);
     gpio_set_dir(BUZZER, GPIO_OUT);
     gpio_put(BUZZER, 0);
 
-    leds_init();  // Inicializa LEDs
+    leds_init();  
 
     while (1)
     {
         if (fall_detected)
         {
-            // Queda detectada → vermelho fixo + buzzer
             leds_off_all();
             led_on(LED_VERMELHO);
-            gpio_put(BUZZER, 1);  // Liga buzzer
+            gpio_put(BUZZER, 1);  
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
-            gpio_put(BUZZER, 0);  // Desliga buzzer (pode deixar ligado se quiser)
+            gpio_put(BUZZER, 0);  
         }
         else if (gpio_get(SIM_PIN) == 0)
         {
-            // Simulação ativa → verde fixo
             leds_off_all();
             led_on(LED_VERDE);
-            gpio_put(BUZZER, 0);  // Garante buzzer desligado
+            gpio_put(BUZZER, 0);  
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
         }
         else
         {
-            // Leitura normal → azul piscando
             leds_off_all();
             led_on(LED_AZUL);
-            gpio_put(BUZZER, 0);  // Garante buzzer desligado
+            gpio_put(BUZZER, 0);  
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
             leds_off_all();
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
@@ -282,10 +257,6 @@ void led_task(void *p)
     }
 }
 
-
-/* ============================================================
-                         MAIN
-   ============================================================ */
 int main()
 {
     stdio_init_all();
@@ -329,6 +300,7 @@ int main()
     xTaskCreate(vl53_task, "VL53", 1024, NULL, 2, NULL);
     xTaskCreate(sim_task,  "SIM",  2048, NULL, 2, NULL);
     xTaskCreate(led_task,  "LED",  256,  NULL, 1, NULL);
+    xTaskCreate(mqtt_task, "MQTT", 4096, NULL, 2, NULL);
 
     vTaskStartScheduler();
 
