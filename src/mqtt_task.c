@@ -12,6 +12,8 @@
 extern volatile bool fall_detected;
 extern volatile bool proximity_alert;
 extern volatile uint16_t vl53_last_range;
+extern volatile bool fall_detected_simul; 
+
 #define SIM_PIN 5
 
 // ---- MQTT CONFIG (DEFINIDO NO CMAKE) ----
@@ -33,6 +35,7 @@ extern volatile uint16_t vl53_last_range;
 
 #define MQTT_TOPIC "pico/fall"
 
+
 // Estado MQTT
 typedef struct {
     ip_addr_t remote_addr;
@@ -40,7 +43,7 @@ typedef struct {
     bool connected;
 } mqtt_state_t;
 
-static mqtt_state_t mqtt_state;
+static mqtt_state_t mqtt_state = {0};
 
 
 // --------------------------- CALLBACKS MQTT ---------------------------
@@ -68,7 +71,7 @@ static void mqtt_start()
 {
     struct mqtt_connect_client_info_t info = {0};
 
-    char client_id[20];
+    char client_id[32];
     pico_get_unique_board_id_string(client_id, sizeof(client_id));
 
     info.client_id = client_id;
@@ -76,11 +79,16 @@ static void mqtt_start()
     info.client_user = MQTT_USERNAME;
     info.client_pass = MQTT_PASSWORD;
 
-    mqtt_state.mqtt_client = mqtt_client_new();
-    if (!mqtt_state.mqtt_client) {
-        printf("[MQTT] Erro ao criar cliente\n");
-        return;
+    // Se já houver um cliente antigo, não criamos um novo sem limpar
+    if (mqtt_state.mqtt_client == NULL) {
+        mqtt_state.mqtt_client = mqtt_client_new();
+        if (!mqtt_state.mqtt_client) {
+            printf("[MQTT] Erro ao criar cliente\n");
+            return;
+        }
     }
+
+    cyw43_arch_lwip_begin();
 
     err_t err = mqtt_client_connect(
         mqtt_state.mqtt_client,
@@ -90,6 +98,8 @@ static void mqtt_start()
         NULL,
         &info
     );
+
+    cyw43_arch_lwip_end();
 
     if (err != ERR_OK) {
         printf("[MQTT] Erro mqtt_client_connect (%d)\n", err);
@@ -103,7 +113,7 @@ static const char* get_led_state()
     if (fall_detected)
         return "vermelho";
 
-    if (gpio_get(SIM_PIN) == 0)
+    if (gpio_get(SIM_PIN) == 0 && fall_detected_simul)
         return "verde";
 
     return "azul";
@@ -124,14 +134,17 @@ static void mqtt_send_event()
     char motivo[20] = "nenhum";
 
     if (fall_detected && proximity_alert)
-        sprintf(motivo, "proximidade");
+        snprintf(motivo, sizeof(motivo), "proximidade");
     else if (fall_detected && vl53_last_range <= 200)
-        sprintf(motivo, "proximidade");
+        snprintf(motivo, sizeof(motivo), "proximidade");
     else if (fall_detected)
-        sprintf(motivo, "mpu");
+        snprintf(motivo, sizeof(motivo), "mpu");
+    else if (fall_detected_simul)
+        snprintf(motivo, sizeof(motivo), "simulacao");
+
 
     char payload[200];
-    snprintf(payload, sizeof(payload),
+    int n = snprintf(payload, sizeof(payload),
         "{ \"queda\": %s, \"motivo\": \"%s\", \"led\": \"%s\", \"buzzer\": %s, \"dist_mm\": %u }",
         fall_detected ? "true" : "false",
         motivo,
@@ -140,14 +153,16 @@ static void mqtt_send_event()
         vl53_last_range
     );
 
+    if (n <= 0) return;
+
     cyw43_arch_lwip_begin();
     mqtt_publish(
         mqtt_state.mqtt_client,
         MQTT_TOPIC,
         payload,
         strlen(payload),
-        0,      // QoS
-        0,      // no retain
+        0,
+        0,
         mqtt_pub_cb,
         NULL
     );
@@ -169,15 +184,20 @@ void mqtt_task(void *p)
     }
     cyw43_arch_enable_sta_mode();
 
+    printf("[MQTT] SSID compilado = %s\n", WIFI_SSID);
+    printf("[MQTT] Broker compilado = %s\n", MQTT_SERVER);
+
     printf("[MQTT] Conectando ao WiFi: %s\n", WIFI_SSID);
 
+wifi_reconnect:
     if (cyw43_arch_wifi_connect_timeout_ms(
             WIFI_SSID, WIFI_PASSWORD,
             CYW43_AUTH_WPA2_AES_PSK,
             30000)) {
 
-        printf("[MQTT] Falha conexão WiFi\n");
-        vTaskDelete(NULL);
+        printf("[MQTT] Falha conexão WiFi → tentando novamente...\n");
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        goto wifi_reconnect;
     }
 
     printf("[MQTT] WiFi conectado!\n");
@@ -187,25 +207,47 @@ void mqtt_task(void *p)
         vTaskDelete(NULL);
     }
 
+mqtt_reconnect:
     mqtt_start();
 
     bool last_fall_state = false;
+    static uint32_t last_wifi_check = 0;
 
-    while (1)
+    for (;;)
     {
-        if (!mqtt_state.connected) {
-            vTaskDelay(pdMS_TO_TICKS(3000));
-            mqtt_start();
-            continue;
+        cyw43_arch_poll();
+
+        // 🔥 MANTER A TASK RESPONDENDO → EVITA DESCONEXÃO
+        vTaskDelay(pdMS_TO_TICKS(5));
+
+        // ---------------------- VERIFICAR SE O WIFI CAIU ----------------------
+        if (xTaskGetTickCount() - last_wifi_check > pdMS_TO_TICKS(3000)) {
+            last_wifi_check = xTaskGetTickCount();
+
+            int st = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA);
+
+            if (st < 0) {
+                printf("[WiFi] Conexão perdida (%d)! Tentando reconectar...\n", st);
+                mqtt_state.connected = false;
+                goto wifi_reconnect;
+            }
         }
 
-        // SOMENTE ENVIA AO HAVER ALTERAÇÃO NO ESTADO
-        if (fall_detected != last_fall_state || proximity_alert) {
+        // ---------------------- RECONEXÃO MQTT ----------------------
+        if (!mqtt_state.connected) {
+            printf("[MQTT] Desconectado → tentando reconectar...\n");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            goto mqtt_reconnect;
+        }
+
+        // ---------------------- ENVIO DE EVENTO ----------------------
+        if (fall_detected != last_fall_state || proximity_alert || fall_detected_simul) {
             mqtt_send_event();
             last_fall_state = fall_detected;
-            proximity_alert = false;
-        }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+            if (fall_detected_simul) fall_detected_simul = false;
+
+            if (proximity_alert) proximity_alert = false;
+        }
     }
 }
