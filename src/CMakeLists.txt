@@ -51,12 +51,12 @@ pico_enable_stdio_uart(${ProjectName} 0)
 pico_enable_stdio_usb(${ProjectName} 1)
 
 add_compile_definitions(
-    WIFI_SSID="minhaWifi"
-    WIFI_PASSWORD="senha123"
-    MQTT_SERVER="192.168.1.10"
+    WIFI_SSID="VIVOFIBRA-88C0"
+    WIFI_PASSWORD="E429AE7076"
+    MQTT_SERVER="35.192.99.84"
     MQTT_PORT=1883
-    MQTT_USERNAME="user"
-    MQTT_PASSWORD="pass"
+    MQTT_USERNAME="thales_fortes"
+    MQTT_PASSWORD="92097540t"
 )
 
 target_include_directories(${ProjectName} PRIVATE

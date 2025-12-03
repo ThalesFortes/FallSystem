@@ -12,6 +12,7 @@
 #define SIM_PIN 5
 
 extern SemaphoreHandle_t i2c_mutex;  // Mutex I2C do main.c
+extern volatile bool fall_detected_simul = false; 
 
 void sim_task(void *p)
 {
@@ -32,6 +33,9 @@ void sim_task(void *p)
 
             printf("[SIM] Trigger 3 enviado\n");
             vTaskDelay(pdMS_TO_TICKS(200));
+
+            printf("[SIM] QUEDA SIMULADA ATIVADA!\n");
+            fall_detected_simul = true;   // <--- SIMULA QUEDA REAL
 
             printf("=== FIM DA SIMULACAO ===\n");
 

@@ -38,9 +38,9 @@ static SemaphoreHandle_t button_sem = NULL;
 #define PROXIMITY_THRESHOLD_MM 200U
 #define PROXIMITY_CONFIRM_COUNT 3
 
-volatile bool proximity_alert = false;
-volatile bool fall_detected = false;
-volatile uint16_t vl53_last_range = 0;
+extern volatile bool proximity_alert = false;
+extern volatile bool fall_detected = false;
+extern volatile uint16_t vl53_last_range = 0;
 
 void button_isr(uint gpio, uint32_t events)
 {
@@ -159,16 +159,22 @@ void vl53_task(void *p)
     {
         printf("[VL53] Inicializando sensor...\n");
         vl53_ok = vl53l0x_init(I2C_PORT);
+
         if (vl53_ok)
         {
             vl53l0x_start_continuous(I2C_PORT);
             printf("[VL53] OK!\n");
         }
+
         xSemaphoreGive(i2c_mutex);
     }
 
     uint16_t range_mm = 0;
     uint8_t consecutive_close = 0;
+
+    // ---- ANTI-FALSO POSITIVO: AGUARDA SENSOR ESTABILIZAR ----
+    TickType_t start_time = xTaskGetTickCount();
+    const TickType_t warmup_time = pdMS_TO_TICKS(1000); // 1 segundo
 
     for (;;)
     {
@@ -178,6 +184,7 @@ void vl53_task(void *p)
             continue;
         }
 
+        // Se SIM estiver ativo, desativa proximidade
         if (gpio_get(SIM_PIN) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -197,18 +204,40 @@ void vl53_task(void *p)
             }
 
             vl53_last_range = range_mm;
-            printf("[VL53] Dist = %u mm\n", range_mm);
 
+            // ---- IGNORAR LEITURAS NOS PRIMEIROS 1000ms ----
+            if (xTaskGetTickCount() - start_time < warmup_time)
+            {
+                // Zeramos o contador pq no início o sensor dá 20~30mm
+                consecutive_close = 0;
+                vTaskDelay(pdMS_TO_TICKS(50));
+                continue;
+            }
+
+            // ---- FILTRAR LEITURAS IMPOSSÍVEIS (<50mm) ----
+            if (range_mm < 50)
+            {
+                // Ruído comum do VL53 logo após boot
+                // Não contar como proximidade
+                consecutive_close = 0;
+                vTaskDelay(pdMS_TO_TICKS(50));
+                continue;
+            }
+
+            // ---- LÓGICA DE PROXIMIDADE ----
             if (range_mm <= PROXIMITY_THRESHOLD_MM)
             {
                 consecutive_close++;
+
                 if (consecutive_close >= PROXIMITY_CONFIRM_COUNT)
                 {
                     proximity_alert = true;
+                    printf("[VL53] ALERTA PROXIMIDADE! (%u mm)\n", range_mm);
                     consecutive_close = 0;
                 }
             }
-            else {
+            else
+            {
                 consecutive_close = 0;
             }
         }
@@ -216,6 +245,7 @@ void vl53_task(void *p)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
+
 
 void led_task(void *p)
 {
