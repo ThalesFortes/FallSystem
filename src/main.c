@@ -31,12 +31,14 @@
 #define BUZZER 21
 #define BUTTON_PIN 6
 
+extern volatile bool fall_detected_simul;
 extern SemaphoreHandle_t i2c_mutex = NULL;
 static SemaphoreHandle_t button_sem = NULL;
 
 #define LOG_INTERVAL_MS 1000
 #define PROXIMITY_THRESHOLD_MM 200U
 #define PROXIMITY_CONFIRM_COUNT 3
+#define FALL_PROXIMITY_MM 120
 
 extern volatile bool proximity_alert = false;
 extern volatile bool fall_detected = false;
@@ -91,6 +93,7 @@ void mpu_task(void *p)
             fs.fall = true;
             proximity_alert = false;
             printf("[MPU] QUEDA MARCADA POR PROXIMIDADE!\n");
+            
         }
 
         if (xSemaphoreTake(button_sem, 0) == pdTRUE)
@@ -233,6 +236,18 @@ void vl53_task(void *p)
                 {
                     proximity_alert = true;
                     printf("[VL53] ALERTA PROXIMIDADE! (%u mm)\n", range_mm);
+                    printf("[VL53] DEBUG: range=%u, FALL_PROXIMITY_MM=%u\n", range_mm, FALL_PROXIMITY_MM);
+
+                    
+
+                     // --- NOVA LÓGICA: tratar proximidade MUITO PRÓXIMA como queda ---
+                    if (range_mm <= FALL_PROXIMITY_MM) {
+                        // Sinaliza detecção de queda por proximidade muito próxima
+                        proximity_alert = true;
+                        //fall_detected = true;
+                        printf("[VL53] QUEDA DETECTADA POR PROXIMIDADE! (%u mm)\n", range_mm);
+                    }
+
                     consecutive_close = 0;
                 }
             }
@@ -260,32 +275,47 @@ void led_task(void *p)
 
     while (1)
     {
+        // ✨ PRIORIDADE 1: SIMULAÇÃO
+        if (fall_detected_simul)
+        {
+            leds_off_all();
+            led_on(LED_VERDE);
+            gpio_put(BUZZER, 0);
+            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
+            continue;
+        }
+
+        // ✨ PRIORIDADE 2: QUEDA REAL
         if (fall_detected)
         {
             leds_off_all();
             led_on(LED_VERMELHO);
-            gpio_put(BUZZER, 1);  
+            gpio_put(BUZZER, 1);
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
-            gpio_put(BUZZER, 0);  
+            gpio_put(BUZZER, 0);
+            continue;
         }
-        else if (gpio_get(SIM_PIN) == 0)
+
+        // ✨ PRIORIDADE 3: MODO SIM (botão ativo)
+        if (gpio_get(SIM_PIN) == 0)
         {
             leds_off_all();
             led_on(LED_VERDE);
-            gpio_put(BUZZER, 0);  
+            gpio_put(BUZZER, 0);
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
+            continue;
         }
-        else
-        {
-            leds_off_all();
-            led_on(LED_AZUL);
-            gpio_put(BUZZER, 0);  
-            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
-            leds_off_all();
-            vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
-        }
+
+        // ✨ PRIORIDADE 4: MODO NORMAL
+        leds_off_all();
+        led_on(LED_AZUL);
+        gpio_put(BUZZER, 0);
+        vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
+        leds_off_all();
+        vTaskDelay(pdMS_TO_TICKS(LED_DELAY_NORMAL));
     }
 }
+
 
 int main()
 {
