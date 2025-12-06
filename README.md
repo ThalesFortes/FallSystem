@@ -1,4 +1,4 @@
-# Sistema de Detecção de Quedas com Raspberry Pi Pico W, MPU6050, VL53L0X, FreeRTOS e MQTT
+# Sistema de Detecção de Quedas rp2040, mpu6050, vl53l0x
 ## 📌 Sobre o Projeto
 
 <p>Este projeto implementa um sistema embarcado completo para detecção de quedas, utilizando a Raspberry Pi Pico W, sensores de movimento MPU6050, sensor de proximidade VL53L0X, comunicação MQTT, multitarefas com FreeRTOS, um módulo de feedback com LED RGB + buzzer, e exibição em display OLED SSD1306.
