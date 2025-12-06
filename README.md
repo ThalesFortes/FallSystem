@@ -11,25 +11,26 @@
   <p>-- OLED: Exibe status, leituras e motivos</p>
 
 ## 📡 Funcionalidades Principais
- ✔ Detecção real de queda usando MPU6050 baseada em: Magnitude da aceleração ,variação de ângulo ,sequência de triggers validada (T1 → T2 → T3)
- ✔ Detecção por proximidade (VL53L0X): Identifica aproximação extrema (ex.: corpo batendo no chão), usa leitura filtrada com anti-ruído e warm-up, pode confirmar queda independentemente dos demais triggers
- ✔ Comunicação MQTT:Envio periódico do estado do sistema (a cada 5 segundos), envio imediato ao detectar queda, mensagens incluem: Motivo ,tipo de trigger,leituras de sensores, timestamp, estado atual
- ✔ Multitarefas com FreeRTOS
- ✔ Tasks principais: mpu_task(), vl53_task(), mqtt_task(), oled_task(), led_task(), sim_task()
- ✔ Três modos de operação: Normal, detecção real, simulação por chave física
+  <p>✔ Detecção real de queda usando MPU6050 baseada em: Magnitude da aceleração ,variação de ângulo ,sequência de triggers validada (T1 → T2 → T3)</p>
+  <p>✔ Detecção por proximidade (VL53L0X): Identifica aproximação extrema (ex.: corpo batendo no chão), usa leitura filtrada com anti-ruído e warm-up, pode confirmar queda independentemente dos demais triggers</p>
+  <p>✔ Comunicação MQTT:Envio periódico do estado do sistema (a cada 5 segundos), envio imediato ao detectar queda, mensagens incluem: Motivo ,tipo de trigger,leituras de sensores, timestamp, estado atual</p>
+  <p>✔ Multitarefas com FreeRTOS</p>
+  <p>✔ Tasks principais: mpu_task(), vl53_task(), mqtt_task(), oled_task(), led_task(), sim_task()</p>
+  <p>✔ Três modos de operação: Normal, detecção real, simulação por chave física</p>
 
 ## 🛠 Hardware Utilizado
-  Componentes: Raspberry Pi Pico W	Microcontrolador Wi-Fi, execução do firmware ,MPU6050	Acelerômetro + giroscópio ,VL53L0X	ToF – Medição de proximidade
-  ,Display SSD1306 I2C	Interface visual, LED RGB	Indicação do estado, Buzzer ativo	Alerta sonoro ,BUTTONS
+  <p>Componentes: Raspberry Pi Pico W	Microcontrolador Wi-Fi, execução do firmware ,MPU6050	Acelerômetro + giroscópio ,VL53L0X	ToF – Medição de proximidade
+  ,Display SSD1306 I2C	Interface visual, LED RGB	Indicação do estado, Buzzer ativo	Alerta sonoro ,BUTTONS</p>
 
 ## ⚙️ Fluxo de Funcionamento
-  1️⃣Inicialização
-  2️⃣ Leitura de Sensores
-  3️⃣ Lógica de Detecção
-  4️⃣ Notificação
-  5️⃣ Loop Contínuo
-  Envio periódico a cada 5 segundos
-  Sistema permanece monitorando
+<ul>
+  <li> 1️⃣Inicialização</li>
+  <li> 2️⃣ Leitura de Sensores</li>
+  <li> 3️⃣ Lógica de Detecção</li>
+  <li> 4️⃣ Notificação</li>
+  <li>5️⃣ Loop Contínuo</li>
+</ul>
+
 
 # 🔧 Como Compilar
   1- Clone o repositorio
