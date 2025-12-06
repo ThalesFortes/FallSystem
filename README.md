@@ -33,30 +33,30 @@
 
 
 # 🔧 Como Compilar
-  1- Clone o repositorio
-  2- Deploy no Pico W
-  3 - Coloque no Cmake, os dados como ip do servidor, broker, wifi e senha, usuario e senha
+   <p>1- Clone o repositorio</p>
+   <p>2- Deploy no Pico W</p>
+   <p>3 - Coloque no Cmake, os dados como ip do servidor, broker, wifi e senha, usuario e senha
       add_compile_definitions(
       WIFI_SSID="SEUWIFI"
       WIFI_PASSWORD="SENHAWIFI"
       MQTT_SERVER="IP_EXTERNO_BROKER_CRIADO"
       MQTT_PORT=1883
       MQTT_USERNAME="USUARIO_MQTT"
-      MQTT_PASSWORD="SENHA_MQTT")
-  4 - Segure o botão BOOTSEL do Pico W e conecte-o ao PC
-  Clique no botão run no Vscode ou arraste o arquivo .u2 para dentro do disco removível que aparecer
-  O Pico irá reiniciar executando o firmware
-  5- Grave na Pico W Segure BOOTSEL → conecte USB → arraste o .uf2.
+      MQTT_PASSWORD="SENHA_MQTT")</p>
+   <p>4 - Segure o botão BOOTSEL do Pico W e conecte-o ao PC</p>
+   <p>Clique no botão run no Vscode ou arraste o arquivo .u2 para dentro do disco removível que aparecer</p>
+   <p>O Pico irá reiniciar executando o firmware</p>
+   <p>5- Grave na Pico W Segure BOOTSEL → conecte USB → arraste o .uf2.</p>
 
 # 📦 Dependências
-  mpu6500.h para o sensor de aceleração
-  ssd1306.h e ssd1306_fonts.h para o display OLED
-  servo.h para atuador servo motor
-  leds.h para função de ativar e desativar os LEDs
-  mqtt_task.h para conexão via mqtt
-  fall_detector.h para analise de queda
-  vl53l0x.h para detecção por aproximação
+  <p>mpu6500.h para o sensor de aceleração</p>
+  <p>ssd1306.h e ssd1306_fonts.h para o display OLED</p>
+  <p>servo.h para atuador servo motor</p>
+  <p>leds.h para função de ativar e desativar os LEDs</p>
+  <p>mqtt_task.h para conexão via mqtt</p>
+  <p>fall_detector.h para analise de queda</p>
+  <p>vl53l0x.h para detecção por aproximação</p>
 
 # 🎯 Conclusão
 
-Este projeto fornece um sistema de detecção de quedas completo, robusto e modular, pronto para uso em dispositivos vestíveis, sistemas de saúde, monitoramento remoto ou protótipos industriais.
+<p>Este projeto fornece um sistema de detecção de quedas completo, robusto e modular, pronto para uso em dispositivos vestíveis, sistemas de saúde, monitoramento remoto ou protótipos industriais.</p>
