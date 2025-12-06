@@ -11,7 +11,7 @@
 
 #define SIM_PIN 5
 
-extern SemaphoreHandle_t i2c_mutex;  // Mutex I2C do main.c
+extern SemaphoreHandle_t i2c_mutex;
 extern volatile bool fall_detected_simul = false; 
 
 void sim_task(void *p)
@@ -20,7 +20,6 @@ void sim_task(void *p)
 
     while (true)
     {
-        // Verifica se o botão SIM está pressionado (LOW, pull-up)
         if (gpio_get(SIM_PIN) == 0)
         {
             printf("\n=== SIMULACAO DE QUEDA ===\n");
@@ -35,11 +34,10 @@ void sim_task(void *p)
             vTaskDelay(pdMS_TO_TICKS(200));
 
             printf("[SIM] QUEDA SIMULADA ATIVADA!\n");
-            fall_detected_simul = true;   // <--- SIMULA QUEDA REAL
+            fall_detected_simul = true;  
 
             printf("=== FIM DA SIMULACAO ===\n");
 
-            // Atualiza OLED apenas com "SIMULACAO"
             if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
             {
                 ssd1306_Fill(Black);
@@ -53,7 +51,6 @@ void sim_task(void *p)
         }
         else
         {
-            // Aguarda se o botão não estiver pressionado
             vTaskDelay(pdMS_TO_TICKS(100));
         }
     }

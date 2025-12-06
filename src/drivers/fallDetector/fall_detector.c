@@ -76,20 +76,16 @@ void fall_update(fall_state_t* fs, int accel[3], int gyro[3]) {
                 printf("QUEDA DETECTADA!\n");
                 fs->fall = true;
 
-                // Se quiser enviar MQTT:
-                // send_event("fall_detect");
-
             } else {
                 printf("TRIGGER 3 CANCELADO\n");
             }
 
-            // Reset final
+
             fs->trigger3 = false;
             fs->trigger3count = 0;
         }
     }
 
-    // --- Resets automáticos ---
     if (fs->trigger2count >= 6) {
         fs->trigger2 = false;
         fs->trigger2count = 0;

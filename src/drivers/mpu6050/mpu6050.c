@@ -5,7 +5,7 @@
 #define MPU6500_PWR_MGMT    0x6B
 #define MPU6500_ACCEL_X     0x3B
 #define MPU6500_INT_ENABLE  0x38     // habilita interrupções
-#define MPU6500_INT_PIN_CFG 0x37     // configura pino INT
+#define MPU6500_INT_PIN_CFG 0x37     
 
 void mpu6500_init(i2c_inst_t* i2c) 
 {

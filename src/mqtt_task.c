@@ -8,12 +8,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-// ---- IMPORTANTE: drivers de LED e buzzer ----
 #include "drivers/leds/leds.h"
 
 #define BUZZER 21
 
-// Variáveis globais do main.c
+
 extern volatile bool fall_detected;
 extern volatile bool proximity_alert;
 extern volatile uint16_t vl53_last_range;
@@ -22,13 +21,10 @@ extern volatile bool fall_detected_simul;
 #define SIM_PIN 5
 #define FALL_PROXIMITY_MM 120
 
-// Tempo que a queda por MPU deve permanecer antes de voltar ao normal (ms)
 #define FALL_CLEAR_MS 5000
 
-// Envio automático do estado normal:
-#define NORMAL_REPORT_MS 5000   // <---- ENVIO A CADA 1 SEGUNDO
+#define NORMAL_REPORT_MS 5000   
 
-// ---- MQTT CONFIG (DEFINIDO NO CMAKE) ----
 #ifndef MQTT_SERVER
 #error "MQTT_SERVER não definido"
 #endif
@@ -56,20 +52,11 @@ typedef struct {
 
 static mqtt_state_t mqtt_state = {0};
 
-
-// -----------------------------------------------------------------------------
-// FALL CAUSE
-// -----------------------------------------------------------------------------
 typedef enum {
     FALL_CAUSE_NONE = 0,
     FALL_CAUSE_PROXIMITY,
     FALL_CAUSE_MPU
 } fall_cause_t;
-
-
-// =======================================================================
-//                CONTROLE DO LED E BUZZER
-// =======================================================================
 
 static void led_apply_state()
 {
@@ -109,11 +96,6 @@ static void led_apply_state()
     gpio_put(BUZZER, 0);
 }
 
-
-// =======================================================================
-//                          CALLBACKS MQTT
-// =======================================================================
-
 static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status)
 {
     if (status == MQTT_CONNECT_ACCEPTED) {
@@ -132,10 +114,6 @@ static void mqtt_pub_cb(void *arg, err_t err)
     }
 }
 
-
-// =======================================================================
-//                           INICIAR MQTT
-// =======================================================================
 
 static void mqtt_start()
 {
@@ -176,10 +154,6 @@ static void mqtt_start()
 }
 
 
-// =======================================================================
-//                     FUNÇÕES DE ESTADO PARA MQTT
-// =======================================================================
-
 static fall_cause_t compute_fall_cause(void)
 {
     if (proximity_alert)
@@ -210,10 +184,6 @@ static bool is_buzzer_on()
     return fall_detected || proximity_alert ? true : false;
 }
 
-
-// =======================================================================
-//                     ENVIAR ESTADO NORMAL
-// =======================================================================
 
 static void mqtt_send_event_normal_with_cause(fall_cause_t cause)
 {
@@ -254,10 +224,6 @@ static void mqtt_send_event_normal_with_cause(fall_cause_t cause)
 }
 
 
-// =======================================================================
-//                     ENVIAR EVENTO DE SIMULAÇÃO
-// =======================================================================
-
 static void mqtt_send_event_sim()
 {
     const char *led = get_led_state();
@@ -297,10 +263,6 @@ static void mqtt_send_event_sim()
 }
 
 
-// =======================================================================
-//                     TAREFA PRINCIPAL MQTT
-// =======================================================================
-
 void mqtt_task(void *p)
 {
     printf("[MQTT] Task iniciando...\n");
@@ -311,7 +273,6 @@ void mqtt_task(void *p)
     leds_init();
     leds_off_all();
 
-    // ---- WiFi ----
     if (cyw43_arch_init()) {
         printf("[MQTT] Falha ao iniciar WiFi\n");
         vTaskDelete(NULL);
@@ -351,7 +312,7 @@ mqtt_reconnect:
     TickType_t fall_start_tick = 0;
     bool fall_timer_running = false;
 
-    TickType_t last_normal_report = 0;   // <---- CONTROLE DO ENVIO A CADA 1s
+    TickType_t last_normal_report = 0;  
 
     while (true)
     {
@@ -360,7 +321,6 @@ mqtt_reconnect:
 
         led_apply_state();
 
-        // -------- VERIFICAR WIFI --------
         if (xTaskGetTickCount() - last_wifi_check > pdMS_TO_TICKS(3000)) {
 
             last_wifi_check = xTaskGetTickCount();
@@ -373,14 +333,12 @@ mqtt_reconnect:
             }
         }
 
-        // -------- RECONEXÃO MQTT --------
         if (!mqtt_state.connected) {
             printf("[MQTT] Desconectado → tentando reconectar...\n");
             vTaskDelay(pdMS_TO_TICKS(2000));
             goto mqtt_reconnect;
         }
 
-        // -------- EVENTO DE SIMULAÇÃO --------
         if (fall_detected_simul && !sim_sent) {
 
             mqtt_send_event_sim();
@@ -396,7 +354,6 @@ mqtt_reconnect:
         if (is_currently_fall)
             sim_sent = false;
 
-        // ---------- TIMER DE LIMPEZA DE QUEDA MPU ----------
         if (current_cause == FALL_CAUSE_MPU && !fall_timer_running) {
             fall_start_tick = xTaskGetTickCount();
             fall_timer_running = true;
@@ -421,7 +378,6 @@ mqtt_reconnect:
             }
         }
 
-        // -------- ENVIO AUTOMÁTICO DO ESTADO NORMAL A CADA 1s --------
         if (!is_currently_fall &&
             (xTaskGetTickCount() - last_normal_report > pdMS_TO_TICKS(NORMAL_REPORT_MS)))
         {
@@ -429,7 +385,6 @@ mqtt_reconnect:
             last_normal_report = xTaskGetTickCount();
         }
 
-        // -------- ENVIO DE EVENTOS (MUDANÇA DE ESTADO) --------
         if ( (fall_detected != last_fall_state) ||
              proximity_alert ||
              (current_cause == FALL_CAUSE_MPU && fall_detected) )

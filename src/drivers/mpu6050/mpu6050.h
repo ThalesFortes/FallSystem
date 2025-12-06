@@ -13,11 +13,10 @@
 #include <stdint.h>
 #include "hardware/i2c.h"
 
-// Estrutura para armazenar os dados brutos do sensor
 typedef struct {
-    int16_t accel[3]; // Aceleração X, Y, Z
-    int16_t gyro[3];  // Giroscópio X, Y, Z
-    int16_t temp;     // Temperatura
+    int16_t accel[3]; 
+    int16_t gyro[3];  
+    int16_t temp;     
 } mpu6500_data_t;
 
 // Funções públicas

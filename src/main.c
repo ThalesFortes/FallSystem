@@ -116,7 +116,6 @@ void mpu_task(void *p)
                    ax, ay, az, gx, gy, gz);
         }
 
-        /* ---- ATUALIZAÇÃO DO OLED (UNIFICADA) ---- */
         if (xSemaphoreTake(i2c_mutex, pdMS_TO_TICKS(200)) == pdTRUE)
         {
             ssd1306_Fill(Black);
@@ -175,9 +174,8 @@ void vl53_task(void *p)
     uint16_t range_mm = 0;
     uint8_t consecutive_close = 0;
 
-    // ---- ANTI-FALSO POSITIVO: AGUARDA SENSOR ESTABILIZAR ----
     TickType_t start_time = xTaskGetTickCount();
-    const TickType_t warmup_time = pdMS_TO_TICKS(1000); // 1 segundo
+    const TickType_t warmup_time = pdMS_TO_TICKS(1000);
 
     for (;;)
     {
@@ -187,7 +185,6 @@ void vl53_task(void *p)
             continue;
         }
 
-        // Se SIM estiver ativo, desativa proximidade
         if (gpio_get(SIM_PIN) == 0)
         {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -208,26 +205,20 @@ void vl53_task(void *p)
 
             vl53_last_range = range_mm;
 
-            // ---- IGNORAR LEITURAS NOS PRIMEIROS 1000ms ----
             if (xTaskGetTickCount() - start_time < warmup_time)
             {
-                // Zeramos o contador pq no início o sensor dá 20~30mm
                 consecutive_close = 0;
                 vTaskDelay(pdMS_TO_TICKS(50));
                 continue;
             }
 
-            // ---- FILTRAR LEITURAS IMPOSSÍVEIS (<50mm) ----
             if (range_mm < 50)
             {
-                // Ruído comum do VL53 logo após boot
-                // Não contar como proximidade
                 consecutive_close = 0;
                 vTaskDelay(pdMS_TO_TICKS(50));
                 continue;
             }
 
-            // ---- LÓGICA DE PROXIMIDADE ----
             if (range_mm <= PROXIMITY_THRESHOLD_MM)
             {
                 consecutive_close++;
@@ -237,14 +228,8 @@ void vl53_task(void *p)
                     proximity_alert = true;
                     printf("[VL53] ALERTA PROXIMIDADE! (%u mm)\n", range_mm);
                     printf("[VL53] DEBUG: range=%u, FALL_PROXIMITY_MM=%u\n", range_mm, FALL_PROXIMITY_MM);
-
-                    
-
-                     // --- NOVA LÓGICA: tratar proximidade MUITO PRÓXIMA como queda ---
                     if (range_mm <= FALL_PROXIMITY_MM) {
-                        // Sinaliza detecção de queda por proximidade muito próxima
                         proximity_alert = true;
-                        //fall_detected = true;
                         printf("[VL53] QUEDA DETECTADA POR PROXIMIDADE! (%u mm)\n", range_mm);
                     }
 
@@ -275,7 +260,6 @@ void led_task(void *p)
 
     while (1)
     {
-        // ✨ PRIORIDADE 1: SIMULAÇÃO
         if (fall_detected_simul)
         {
             leds_off_all();
@@ -285,7 +269,6 @@ void led_task(void *p)
             continue;
         }
 
-        // ✨ PRIORIDADE 2: QUEDA REAL
         if (fall_detected)
         {
             leds_off_all();
@@ -296,7 +279,6 @@ void led_task(void *p)
             continue;
         }
 
-        // ✨ PRIORIDADE 3: MODO SIM (botão ativo)
         if (gpio_get(SIM_PIN) == 0)
         {
             leds_off_all();
@@ -305,8 +287,6 @@ void led_task(void *p)
             vTaskDelay(pdMS_TO_TICKS(LED_DELAY_FALL));
             continue;
         }
-
-        // ✨ PRIORIDADE 4: MODO NORMAL
         leds_off_all();
         led_on(LED_AZUL);
         gpio_put(BUZZER, 0);

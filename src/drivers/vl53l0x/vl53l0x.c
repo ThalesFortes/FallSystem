@@ -138,13 +138,12 @@ bool vl53l0x_start_continuous(i2c_inst_t *i2c) {
 }
 
 bool vl53l0x_stop_continuous(i2c_inst_t *i2c) {
-    return i2c_write8(i2c, REG_SYSRANGE_START, 0x01); // coloca em single-shot idle
+    return i2c_write8(i2c, REG_SYSRANGE_START, 0x01); 
 }
 
 bool vl53l0x_read_range_mm(i2c_inst_t *i2c, uint16_t *range_mm, uint32_t timeout_ms) {
     absolute_time_t t0 = get_absolute_time();
 
-    // Espera dado pronto (RESULT_INTERRUPT_STATUS bits[2:0] != 0)
     while (true) {
         uint8_t st = 0;
         if (!i2c_read8(i2c, REG_RESULT_INTERRUPT_STATUS, &st)) return false;
@@ -153,10 +152,8 @@ bool vl53l0x_read_range_mm(i2c_inst_t *i2c, uint16_t *range_mm, uint32_t timeout
         sleep_ms(1);
     }
 
-    // range_mm está em RESULT_RANGE_STATUS + 10 (16 bits, big-endian)
     if (!i2c_read16(i2c, REG_RESULT_RANGE_STATUS + 10, range_mm)) return false;
 
-    // Limpa interrupção de "new sample ready"
     if (!i2c_write8(i2c, REG_SYSTEM_INTERRUPT_CLEAR, 0x01)) return false;
 
     return true;
