@@ -1,14 +1,14 @@
 # Sistema de Detecção de Quedas com Raspberry Pi Pico W, MPU6050, VL53L0X, FreeRTOS e MQTT
 ## 📌 Sobre o Projeto
 
-Este projeto implementa um sistema embarcado completo para detecção de quedas, utilizando a Raspberry Pi Pico W, sensores de movimento MPU6050, sensor de proximidade VL53L0X, comunicação MQTT, multitarefas com FreeRTOS, um módulo de feedback com LED RGB + buzzer, e exibição em display OLED SSD1306.
+<p>Este projeto implementa um sistema embarcado completo para detecção de quedas, utilizando a Raspberry Pi Pico W, sensores de movimento MPU6050, sensor de proximidade VL53L0X, comunicação MQTT, multitarefas com FreeRTOS, um módulo de feedback com LED RGB + buzzer, e exibição em display OLED SSD1306.
 
-O sistema foi projetado para funcionar tanto em cenários reais quanto em simulações (modo de teste), permitindo avaliar cada gatilho de queda individualmente: Trigger 1: Queda livre ,Trigger 2: Impacto ,Trigger 3: Imobilidade
-  -- Proximidade Crítica: Detecção por sensor VL53L0X
-  -- Simulação Guiada: Etapas pré-programadas de queda
-  -- Envio MQTT: Motivo da queda + dados dos sensores
-  -- LED/Buzzer: Indicadores visuais e sonoros
-  -- OLED: Exibe status, leituras e motivos
+<p>O sistema foi projetado para funcionar tanto em cenários reais quanto em simulações (modo de teste), permitindo avaliar cada gatilho de queda individualmente: Trigger 1: Queda livre ,Trigger 2: Impacto ,Trigger 3: Imobilidade</p>
+  <p>-- Proximidade Crítica: Detecção por sensor VL53L0X</p>
+  <p>-- Simulação Guiada: Etapas pré-programadas de queda</p>
+  <p>-- Envio MQTT: Motivo da queda + dados dos sensores</p>
+  <p>-- LED/Buzzer: Indicadores visuais e sonoros</p>
+  <p>-- OLED: Exibe status, leituras e motivos</p>
 
 ## 📡 Funcionalidades Principais
  ✔ Detecção real de queda usando MPU6050 baseada em: Magnitude da aceleração ,variação de ângulo ,sequência de triggers validada (T1 → T2 → T3)
